@@ -12,7 +12,7 @@ using namespace std;
 ofstream xout;
 ofstream yout;
 
-const int N = 2;
+const int N = 4;
 
 double f0(vec<double> x){
 	double ans = 0.0;
@@ -38,6 +38,10 @@ double f2(vec<double> x){
 
 double f3(vec<double> x){
 	return x(0)*x(0) + x(1)*x(1);
+}
+
+double f4(vec<double> x){
+	return 0.26*(x(0)*x(0) + x(1)*x(1)) - 0.48*x(0)*x(1);
 }
 
 vector<vec<double>> canonical_dir(int n){
@@ -105,18 +109,24 @@ matrix<double> hessian(vec<double> x, double (f)(vec<double>)){
 
 pair<vec<double>, double> armijo(vec<double> l, vec<double> r, double (f)(vec<double>)){
 	auto d = r-l;
-	auto g = (l-r)*1e-4;
-	double beta = (g.trans()*d).trace();
-	double n = 0.5;
-	double gamma = 0.8;
-	double t = 1;
+	auto alpha = d.norm();
+	d = d.unitary();
+
+
 	double f_l = f(l);
+
+	double beta = 1e-4;
+	double sigma = 0.5;
+
+	double f_g = (gradient(l, f).trans()*d).trace();
+
+
 	while (true){
-		if (f(l + d*t) <= f_l + n*t*beta) break;
-		t *= gamma;
+		if (f(l + d*alpha) <= f_l + beta*alpha*f_g) break;
+		alpha *= sigma;
 	}
 
-	return {l + d*t, f(l + d*t)};
+	return {l + d*alpha, f(l + d*alpha)};
 }
 
 
@@ -167,7 +177,7 @@ template <typename X> X right_limit(X l, X dir, double (f)(X) ){
 	dir = dir.unitary()*EPS;
 	double f_x = f(l);
 	while (true){
-		dir *= 2;
+		dir *= 1.6;
 		double f_next_x = f(l + dir);
 		if (f_next_x > f_x){
 			auto ans = l+dir;
@@ -232,13 +242,22 @@ vec<double> DFP(vec<double> l, double (f)(vec<double>)){
 	matrix<double> I(n, n, -1);
 	matrix<double> B_ = I;
 	while (true){
-		if ((grad.trans()*grad).trace() < STOPPING_EPS) return l;
+		if ((grad.trans()*grad).trace() < STOPPING_EPS) {
+			cout << 1 << endl;
+			return l;
+		}
 		vec<double> p = (B_*grad)*-1;
 		vec<double>	r = right_limit(l, p, f);
 		auto line_search = line_search_method(l, r, f);
 		vec<double> min_point = line_search.first;
-		if ((min_point-l).norm() < STOPPING_EPS) return l;
-		if (fabs(f(min_point) - f(l)) < STOPPING_EPS) return l;
+		if ((min_point-l).norm() < STOPPING_EPS) {
+			cout << 2 << endl;
+			return l;
+		}
+		if (fabs(f(min_point) - f(l)) < STOPPING_EPS) {
+			cout << 3 << endl;
+			return l;
+		}
 
 
 		vec<double> s = min_point-l;
@@ -295,6 +314,44 @@ vec<double> BFGS(vec<double> l, double (f)(vec<double>)){
 	}
 }
 
+vec<double> conjugate_gradient_method_sq(vec<double> l, double(f)(vec<double>)){
+	auto grad = gradient(l, f);
+	auto d = grad*-1;
+	while (true){
+		if ((grad.trans()*grad).trace() < STOPPING_EPS) return l;
+		auto B = hessian(l, f);
+		double alpha = -(grad.trans()*d).trace()/(d.trans()*(B*d)).trace();
+		vec<double> min_point = l + d*alpha;
+		if ((min_point-l).norm() < STOPPING_EPS) return l;
+		if (fabs(f(min_point) - f(l)) < STOPPING_EPS) return l;
+		auto r = min_point;
+		auto next_grad = gradient(r, f);
+		double beta = (next_grad.trans()*(B*d)).trace()/(d.trans()*(B*d)).trace();
+
+		d = next_grad*-1 + d*beta;
+		grad = next_grad;
+		l = r;
+	}
+}
+
+vec<double> conjugate_gradient_method_uni(vec<double> l, double(f)(vec<double>)){
+	auto grad = gradient(l, f);
+	auto d = grad*-1;
+	while (true){
+		if ((grad.trans()*grad).trace() < STOPPING_EPS) return l;
+		vec<double>	r = right_limit(l, d, f);
+		auto line_search = line_search_method(l, r, f);
+		vec<double> min_point = line_search.first;
+		if ((min_point-l).norm() < STOPPING_EPS) return l;
+		if (fabs(f(min_point) - f(l)) < STOPPING_EPS) return l;
+		l = min_point;
+		auto next_grad = gradient(l, f);
+		double beta = (next_grad.trans()*d).trace()/(d.trans()*d).trace();
+
+		d = next_grad*-1 + d*beta;
+		grad = next_grad;
+	}
+}
 
 /*
 https://en.wikipedia.org/wiki/Ellipsoid_method
@@ -328,11 +385,12 @@ vec<double> ellipsoid(vec<double> x, double (f)(vec<double>)){
 int main(){
 	cout << fixed << setprecision(8);
 	mt19937 rng((int) chrono::steady_clock::now().time_since_epoch().count());
-	uniform_real_distribution<double> distribution(-50.0, 50.0);
+	double lim = 5.0;
+	uniform_real_distribution<double> distribution(-lim, lim);
 
 
-	auto f = f0; //funcao otimizada
-	auto method = newton_method; //método de otimizacao
+	auto f = f1; //funcao otimizada
+	auto method = conjugate_gradient_method_uni; //método de otimizacao
 	vec<double> i(N);
 	for (int j = 0; j < N; j++){
 		i(j) = distribution(rng);
