@@ -39,24 +39,24 @@ template<typename T> struct matrix {
 	}
 	matrix(initializer_list<initializer_list<T>> c):
 		n(c.size()), m((*c.begin()).size()){
-		in = vector<vector<T>>(n, vector<T>(m, 0));
-		int i, j;
-		i = 0;
-		for (auto &it : c){
-			j = 0;
-			for (auto &jt : it){
-				in[i][j] = jt;
-				j++;
+			in = vector<vector<T>>(n, vector<T>(m, 0));
+			int i, j;
+			i = 0;
+			for (auto &it : c){
+				j = 0;
+				for (auto &jt : it){
+					in[i][j] = jt;
+					j++;
+				}
+				i++;
 			}
-			i++;
+			is_transposed = false;
 		}
-		is_transposed = false;
-	}
 	matrix(vector<T> v):
 		matrix(v.size(), v.size(), 0){
-		for (int i = 0; i < v.size(); i++)
-			in[i][i] = v[i];
-	}
+			for (int i = 0; i < v.size(); i++)
+				in[i][i] = v[i];
+		}
 	T &operator()(int i){
 		return in[i][0];
 	}
@@ -138,25 +138,37 @@ template<typename T> struct matrix {
 		t.is_transposed = true;
 		return t;
 	}
-	T det(){
-		if (n != m) throw logic_error("not a square matrix");
-		if (n != 2) throw "not implemented yet :(";
-		matrix<T> &t = (*this);
-		return t(0, 0)*t(1, 1) - t(0, 1)*t(1, 0);
+	matrix<T> inverse(){
+		matrix<T> l(n, n, -1);
+		matrix<T> r = *this;
+		for (int i = 0; i < n; i++){
+			if (abs(r(i, i)) < EPS) continue;
+			double inv = 1.0/r(i, i);
+			for (int j = 0; j < n; j++){
+				l(i, j) = l(i, j) * inv;
+				r(i, j) = r(i, j) * inv;
+			}
+			for (int k = 0; k < n; k++){
+				if (k == i) continue;
+				if (abs(r(k, i)) < EPS) continue;
+				double fat = r(k, i);
+				for (int j = 0; j < n; j++){
+					l(k, j) = l(k, j) - fat*l(i, j);
+					r(k, j) = r(k, j) - fat*r(i, j);
+				}
+			}
+		}
+		return l;
 	}
-	pair<bool, matrix<T>> inverse(){
-		if (n != m) throw logic_error("not a square matrix");
-		if (n != 2) throw "not implemented yet :(";
-		matrix<T> &t = (*this);
-		if (fabs(t.det()) < EPS) return {true, matrix<T>(0, 0)};
-	}
+
+
 	/*vec only*/
 
 	matrix(int n):
 		matrix(n, 1){
 			for (int i = 0; i < n; i++)
 				in[i][0] = 0;
-	}
+		}
 	double norm(){
 		matrix<double> v = *this;
 		if (n == 2) return hypot(v(0), v(1));
