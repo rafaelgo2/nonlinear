@@ -18,7 +18,7 @@ void log(ofstream &logger, vec<double> v, double (f)(vec<double>)){
 	it++;
 }
 
-const int N = 2;
+int N;
 
 double f0(vec<double> x){
 	double ans = 0.0;
@@ -176,7 +176,7 @@ pair<vec<double>, double> goldensection(vec<double> l, vec<double> r, double (f)
 	return {ans, f_ans};
 }
 
-auto line_search_method = armijo;
+auto line_search_method = goldensection;
 
 template <typename X> X right_limit(X l, X dir, double (f)(X) ){
 	auto tmpL = l;
@@ -490,16 +490,14 @@ int main(){
 	uniform_real_distribution<double> distribution(-lim, lim);
 
 
-	auto f = f2; //funcao otimizada
+	auto f = f1; //funcao otimizada
+	N = 20; //dimensao do vetor do dominio
+	line_search_method = goldensection; //busca linear
 
 	vec<double> i(N);
 	for (int j = 0; j < N; j++){
 		i(j) = distribution(rng);
 	}
-	i = {
-		{2.54358100},
-		{4.73342043}
-	};
 	cout << "starting point " << i << endl;
 	for (auto method : {gradient_method, conjugate_gradient_method_sq, conjugate_gradient_method_uni, newton_method, newton_method_line_search, DFP, BFGS, ellipsoid}){
 		auto ans = method(i, f);
